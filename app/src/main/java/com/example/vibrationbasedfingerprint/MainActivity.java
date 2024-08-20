@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -16,6 +17,10 @@ import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -31,6 +36,9 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isVibrating = false;
 
+    /**
+     *
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -63,32 +71,30 @@ public class MainActivity extends AppCompatActivity {
         });
 
         //-----------------------------------------------
-        // 获取TextView用于显示触摸信息 -- debug
+        // Get the Component of TextView: to show the touch info -- debug
         touchInfoTextView = findViewById(R.id.touchInfoTextView);
 
-        // 创建并启动HandlerThread
+        // HandlerThread
         handlerThread = new HandlerThread("VibrationAndTouchThread");
         handlerThread.start();
 
-        // 在HandlerThread的Looper中创建一个Handler
         backgroundHandler = new Handler(handlerThread.getLooper()) {
             @Override
             public void handleMessage(Message msg) {
-                // 处理后台任务
+                // handler background task
                 MotionEvent event = (MotionEvent) msg.obj;
                 recordTouchData(event);
             }
         };
 
-        // 获取根布局视图
+        // get rootView
         View rootView = findViewById(android.R.id.content);
 
-        // 设置全局触摸监听器
         rootView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (isVibrating && event.getAction() == MotionEvent.ACTION_DOWN) {
-                    // 将触摸数据记录任务发送到后台线程
+                if (isVibrating && event.getAction() == MotionEvent.ACTION_MOVE) {
+                    // record the touch event data
                     Message touchMsg = backgroundHandler.obtainMessage(2, event);
                     backgroundHandler.sendMessage(touchMsg);
                 }
@@ -97,7 +103,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // begin vibration
+    /**
+     *
+     * @param repeatable
+     */
     private void startVibration(int repeatable) {
         if (vibrator != null && vibrator.hasVibrator()) {
             long[] timings = new long[] { 50, 50, 50, 50, 50, 100, 350, 250 };
@@ -108,7 +117,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // stop vibration
+    /**
+     *
+     */
     private void stopVibration() {
         if (vibrator != null) {
             vibrator.cancel();
@@ -116,16 +127,61 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // 记录触摸数据（此方法在后台线程中调用）
+    /**
+     *
+     * @param event
+     */
     private void recordTouchData(MotionEvent event) {
         float touchArea = event.getSize();
         float touchPressure = event.getPressure();
         float touchX = event.getX();
         float touchY = event.getY();
+        long eventTime = event.getEventTime();
 
-        // 将结果传回主线程以更新UI
-        runOnUiThread(() -> touchInfoTextView.setText("Area: " + touchArea + "\nPressure: " + touchPressure +
+        // Debug --> show on Root View
+        runOnUiThread(() -> touchInfoTextView.setText("\nArea: " + touchArea + "\nPressure: " + touchPressure +
                 "\nX: " + touchX + "\nY: " + touchY));
+
+        // todo--- record the event as a csv file
+        saveEventDataToCsv(touchArea, touchPressure, touchX, touchY, eventTime);
+    }
+
+    /**
+     * Save motion event data
+     * @param area
+     * @param pressure
+     * @param x
+     * @param y
+     * @param eventTime
+     */
+    private void saveEventDataToCsv(float area, float pressure, float x, float y, long eventTime) {
+        //File csvFile = new File(getExternalFilesDir(null), "touch_event_data.csv");
+        //this.getExternalFilesDir(null).getAbsolutePath();
+
+        // the directory:\Internal storage\Documents
+        File csvFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "touch_event_data.csv");
+
+        boolean isFileNew = !csvFile.exists();
+
+        try (FileWriter writer = new FileWriter(csvFile, true)) { // 'true': can append
+
+            // if file doesn't exist, insert the header line
+            if (isFileNew) {
+                writer.append("Timestamp,Area,Pressure,X,Y\n");
+            }
+
+            // row data
+            writer.append(eventTime + ",");
+            writer.append(area + ",");
+            writer.append(pressure + ",");
+            writer.append(x + ",");
+            writer.append(y + "\n");
+
+            // flush data to the file
+            writer.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -133,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         stopVibration();
 
-        // 停止HandlerThread
+        // Stop HandlerThread
         handlerThread.quitSafely();
     }
 }
