@@ -6,19 +6,11 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp">
-
-        <Switch
-            android:id="@+id/switchVibration"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Enable Repeatable"
-            android:layout_marginTop="20dp"
-            android:checked="true"/>
 
         <Button
             android:id="@+id/startVibrationButton"
@@ -27,20 +19,19 @@
             android:text="Start Vibration"
             android:layout_marginTop="20dp"/>
 
-        <Button
-            android:id="@+id/stopVibrationButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Stop Vibration"
-            android:layout_marginTop="20dp"/>
-
         <TextView
             android:id="@+id/touchInfoTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
             android:text="Touch the screen to get area and pressure"
-            android:textSize="18sp"
-            android:layout_gravity="center_horizontal" />
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/pressButton"
+            android:layout_width="match_parent"
+            android:layout_height="465dp"
+            android:text="Please Press" />
 
     </LinearLayout>
 

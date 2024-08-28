@@ -24,28 +24,27 @@ import java.io.IOException;
 
 import com.example.vibrationbasedfingerprint.motorControl.MotorExecThread;
 
+
+// screen data callback is here
 public class MainActivity extends AppCompatActivity {
 
     private Vibrator vibrator;
-    private Switch switchVibration;
+
     private Button startVibrationButton;
-    private Button stopVibrationButton;
+
+    private View mSensingAreaButton;
+
     private TextView touchInfoTextView;
 
     // HandlerThread for background processing
     private HandlerThread handlerThread;
-    private Handler backgroundHandler;
+    // private Handler backgroundHandler;
 
-    private boolean isVibrating = false;
+    // private boolean isVibrating = false;
 
     private static MotorExecThread mMotorThread = null;
     private Context mContext = null;
 
-    /**
-     *
-     */
-
-    // TODO: onDestroy
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,109 +52,66 @@ public class MainActivity extends AppCompatActivity {
 
         // initialize vibrator
         mContext = getApplicationContext();
-        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        // vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
         // UI component
-        switchVibration = findViewById(R.id.switchVibration);
+
         startVibrationButton = findViewById(R.id.startVibrationButton);
-        stopVibrationButton = findViewById(R.id.stopVibrationButton);
+
+        mSensingAreaButton = findViewById(R.id.pressButton);
 
         mMotorThread = MotorExecThread.getInstance(mContext);
 
+        handlerThread = new HandlerThread("VibrationAndTouchThread");
+        handlerThread.start();
         // start event
         startVibrationButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 mMotorThread.oneShot();
-                int repeatable = switchVibration.isChecked() ? 1 : -1;
-                // startVibration(repeatable);
-                isVibrating = true;
+                // TODO: add a thread to record data, 
+                // one shot: start new file, 
+                // write for period of time, 
+                // stop receiving data write the rest inside the queue
+                // end writing and wait until next time to write a new one
+
             }
         });
 
-        // stop event
-        stopVibrationButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // stopVibration();
-            }
-        });
 
-        //-----------------------------------------------
-        // Get the Component of TextView: to show the touch info -- debug
+
         touchInfoTextView = findViewById(R.id.touchInfoTextView);
-
-        // HandlerThread
-        handlerThread = new HandlerThread("VibrationAndTouchThread");
-        handlerThread.start();
-
-        backgroundHandler = new Handler(handlerThread.getLooper()) {
-            @Override
-            public void handleMessage(Message msg) {
-                // handler background task
-                MotionEvent event = (MotionEvent) msg.obj;
-                recordTouchData(event);
-            }
-        };
-
-        // get rootView
-        View rootView = findViewById(android.R.id.content);
-
-        rootView.setOnTouchListener(new View.OnTouchListener() {
+        mSensingAreaButton.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (isVibrating && event.getAction() == MotionEvent.ACTION_MOVE) {
-                    // record the touch event data
-                    Message touchMsg = backgroundHandler.obtainMessage(2, event);
-                    backgroundHandler.sendMessage(touchMsg);
+                // if (isVibrating && event.getAction() == MotionEvent.ACTION_MOVE) {
+                // if (event.getAction() == MotionEvent.ACTION_MOVE || event.getAction() == MotionEvent.ACTION_DOWN) {
+                // JUST RECORD EVERYTHING
+
+                if(event.getAction() == MotionEvent.ACTION_UP) {
+                    touchInfoTextView.setText("Touch the screen to get area and pressure");
+                    // TODO: consider use this up/down to trigger the record
+
+                } else {
+                    float touchArea = event.getSize();
+                    float touchPressure = event.getPressure();
+                    float touchX = event.getX();
+                    float touchY = event.getY();
+                    long eventTime = event.getEventTime();
+                    String dataStr = "\nArea: " + touchArea + 
+                                     "\nPressure: " + touchPressure +
+                                     "\nX: " + touchX + "\nY: " + touchY;
+                    String dataStrRecord = "Area: " + touchArea + 
+                                     "\tPressure: " + touchPressure +
+                                     "\tX: " + touchX + "\tY: " + touchY;
+                    // throw this str to wrin
+                    touchInfoTextView.setText(dataStr);
                 }
                 return true;
             }
         });
     }
 
-    /**
-     *
-     * @param repeatable
-     */
-    private void startVibration(int repeatable) {
-        if (vibrator != null && vibrator.hasVibrator()) {
-            long[] timings = new long[] { 50, 50, 50, 50, 50, 100, 350, 250 };
-            int[] amplitudes = new int[] { 77, 79, 84, 99, 143, 255, 0, 255 };
-            //int repeatIndex = 1; // Do not repeat.
-
-            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, repeatable));
-        }
-    }
-
-    /**
-     *
-     */
-    private void stopVibration() {
-        if (vibrator != null) {
-            vibrator.cancel();
-            isVibrating = false;
-        }
-    }
-
-    /**
-     *
-     * @param event
-     */
-    private void recordTouchData(MotionEvent event) {
-        float touchArea = event.getSize();
-        float touchPressure = event.getPressure();
-        float touchX = event.getX();
-        float touchY = event.getY();
-        long eventTime = event.getEventTime();
-
-        // Debug --> show on Root View
-        runOnUiThread(() -> touchInfoTextView.setText("\nArea: " + touchArea + "\nPressure: " + touchPressure +
-                "\nX: " + touchX + "\nY: " + touchY));
-
-        // todo--- record the event as a csv file
-        saveEventDataToCsv(touchArea, touchPressure, touchX, touchY, eventTime);
-    }
 
     /**
      * Save motion event data
@@ -198,9 +154,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopVibration();
+//        stopVibration();
 
         // Stop HandlerThread
-        handlerThread.quitSafely();
+        // handlerThread.quitSafely();
+        if(mMotorThread != null) {
+            mMotorThread.deleteInstance();
+        }
+
+        // and exit of data writing thread
+        
     }
 }
